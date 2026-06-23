@@ -39,9 +39,30 @@
         .auth-container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px 24px; text-align: center; background: radial-gradient(circle at top, #111827 0%, #030712 100%); }
         .auth-logo { font-family: 'Cinzel', serif; color: #f59e0b; font-size: 36px; font-weight: 800; letter-spacing: 4px; margin-bottom: 8px; text-shadow: 0 0 20px rgba(245, 158, 11, 0.4); }
         .auth-subtitle { color: #9ca3af; font-size: 11px; margin-bottom: 40px; letter-spacing: 2px; text-transform: uppercase; font-weight: 500; }
-        .auth-card { width: 100%; background: #0f172a; padding: 24px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
-        .auth-switch { color: #9ca3af; font-size: 13px; margin-top: 24px; cursor: pointer; }
-        .auth-switch b { color: #f59e0b; }
+        .auth-card { width: 100%; background: #0f172a; padding: 32px 24px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+        
+        /* TOMBOL GOOGLE PREMIUM STYLE */
+        .btn-google { 
+            width: 100%; 
+            background: #ffffff; 
+            color: #111827; 
+            padding: 14px; 
+            border-radius: 14px; 
+            font-weight: 700; 
+            text-transform: uppercase; 
+            font-size: 13px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 12px; 
+            cursor: pointer; 
+            border: none; 
+            letter-spacing: 0.5px; 
+            transition: 0.2s;
+            box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
+        }
+        .btn-google:active { transform: scale(0.98); background: #f3f4f6; }
+        .google-icon { width: 18px; height: 18px; object-fit: contain; }
 
         /* ASYMMETRIC DYNAMIC BANNER */
         .banner { height: 140px; border-radius: 24px; border: 1px solid rgba(245, 158, 11, 0.2); display: flex; flex-direction: column; justify-content: center; padding: 0 24px; margin-bottom: 24px; background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%); position: relative; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
@@ -115,15 +136,6 @@
             font-size: 12px;
             color: #9ca3af;
             font-weight: 500;
-        }
-        .gn-readmore {
-            font-size: 13px;
-            color: #60a5fa;
-            font-weight: 700;
-            text-transform: uppercase;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
         }
         .news-topbar {
             position: sticky;
@@ -302,26 +314,16 @@
     <div id="authPage" class="page-section">
         <div class="auth-container">
             <div class="auth-logo">NUSA CRAFT</div>
-            <div class="auth-subtitle" id="authTitleText">Login Akun Server</div>
+            <div class="auth-subtitle">Official Server Dashboard</div>
             
             <div class="auth-card">
-                <input type="text" id="authUsername" placeholder="Username Minecraft" class="input-text" autocomplete="off">
-                
-                <div style="position: relative; width: 100%; margin-bottom: 14px;">
-                    <input type="password" id="authPassword" placeholder="Masukkan Password" class="input-text" style="margin-bottom: 0; padding-right: 48px;">
-                    <span onclick="togglePasswordVisibility('authPassword', this)" style="position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: #6b7280; cursor: pointer; user-select: none; font-size: 16px;">👁️</span>
+                <div style="color: #9ca3af; font-size: 13px; margin-bottom: 24px; line-height: 1.5;">
+                    Silakan masuk menggunakan akun Google Anda untuk mensinkronisasi progres game, koin, dan berita favorit Anda ke cloud secara otomatis.
                 </div>
-                
-                <div id="confirmPasswordWrapper" style="position: relative; width: 100%; margin-bottom: 14px; display: none;">
-                    <input type="password" id="authPasswordConfirm" placeholder="Konfirmasi Password" class="input-text" style="margin-bottom: 0; padding-right: 48px;">
-                    <span onclick="togglePasswordVisibility('authPasswordConfirm', this)" style="position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: #6b7280; cursor: pointer; user-select: none; font-size: 16px;">👁️</span>
-                </div>
-                
-                <button class="btn-action" id="btnAuthAction" onclick="handleAuth()">MASUK GAME</button>
-            </div>
-            
-            <div class="auth-switch" id="authSwitchBtn" onclick="toggleAuthMode()">
-                Belum punya akun? <b>Daftar di sini</b>
+                <button class="btn-google" id="btnGoogleAuth" onclick="loginDenganGoogle()">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="google-icon" alt="Google">
+                    Masuk dengan Google
+                </button>
             </div>
         </div>
     </div>
@@ -416,7 +418,7 @@
                 <div class="title">NUSA CRAFT</div>
                 <div class="subtitle">Official Server Channel</div>
                 </div>
-                <div class="menu-card col-6" onclick="showAuthPage()" style="min-height: 50px; background: rgba(239,68,68,0.05); border: 1px dashed rgba(239,68,68,0.2); color: #fca5a5; display: flex; justify-content: center; align-items: center; font-weight: 700; font-size: 12px; letter-spacing: 1px; border-radius: 16px; margin-top: 10px;">
+                <div class="menu-card col-6" onclick="logoutUser()" style="min-height: 50px; background: rgba(239,68,68,0.05); border: 1px dashed rgba(239,68,68,0.2); color: #fca5a5; display: flex; justify-content: center; align-items: center; font-weight: 700; font-size: 12px; letter-spacing: 1px; border-radius: 16px; margin-top: 10px;">
                     🚪 KELUAR AKUN GAME
                 </div>
             </div>
@@ -700,6 +702,104 @@
     </div>
 </div>
 
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDDM9R0bYZLdUTQoqzyiA2zH8eh16zH8Es",
+        authDomain: "nusacraft-9c97b.firebaseapp.com",
+        projectId: "nusacraft-9c97b",
+        storageBucket: "nusacraft-9c97b.firebasestorage.app",
+        messagingSenderId: "1066861996531",
+        appId: "1:1066861996531:web:291d8f681f3be98bf34a86",
+        measurementId: "G-T9KW204DDW"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    
+    // Inisialisasi Driver Keamanan Produksi ke Window global
+    window.db = getFirestore(app);
+    window.auth = getAuth(app);
+    window.doc = doc;
+    window.setDoc = setDoc;
+    window.getDoc = getDoc;
+    window.updateDoc = updateDoc;
+    window.firebaseReady = true;
+
+    const provider = new GoogleAuthProvider();
+
+    // Fungsi Utama: Login Dengan Google Popup (Mode Produksi)
+    window.loginDenganGoogle = async function() {
+        const btn = document.getElementById('btnGoogleAuth');
+        const originalText = btn.innerText;
+        btn.innerText = "MENGHUBUNGKAN GOOGLE...";
+        
+        try {
+            const result = await signInWithPopup(window.auth, provider);
+            const user = result.user;
+            
+            const userRef = window.doc(window.db, "users", user.uid);
+            const docSnap = await window.getDoc(userRef);
+
+            // Bersihkan DisplayName Google menjadi username simpel tanpa spasi untuk Minecraft skin template
+            let cleanName = user.displayName ? user.displayName.split(' ')[0].replace(/[^a-zA-Z0-9_]/g, '') : "Player";
+            if(cleanName === '') cleanName = "Player";
+
+            if (docSnap.exists()) {
+                const dbData = docSnap.data();
+                window.initializeAppWithUserData(dbData, dbData.username || cleanName);
+            } else {
+                // Skema Dokumen Baru Pertama Kali Login
+                const newAccountSchema = {
+                    username: cleanName,
+                    coins: 0,
+                    clickPower: 1,
+                    upgradeCost: 50,
+                    snakeHigh: 0,
+                    savedNews: [],
+                    registeredEvents: [],
+                    createdAt: new Date().toISOString()
+                };
+                await window.setDoc(userRef, newAccountSchema);
+                window.initializeAppWithUserData(newAccountSchema, cleanName);
+            }
+            alert(`✨ Selamat Datang Kembali, ${cleanName}! Data berhasil disinkronisasi.`);
+        } catch (error) {
+            console.error("Auth Error:", error);
+            if(error.code === "auth/popup-blocked") {
+                alert("❌ Blokir Popup Terdeteksi! Mohon izinkan jendela popup pada pengaturan browser Anda agar dapat masuk dengan Google.");
+            } else {
+                alert("⚠️ Gagal masuk: " + error.message);
+            }
+        } finally {
+            if(btn) btn.innerText = originalText;
+        }
+    };
+
+    // Handler Pemantau Status Sesi Aktif Browser
+    onAuthStateChanged(window.auth, async (user) => {
+        if (user) {
+            const userRef = window.doc(window.db, "users", user.uid);
+            const docSnap = await window.getDoc(userRef);
+            if (docSnap.exists()) {
+                window.initializeAppWithUserData(docSnap.data(), docSnap.data().username || "Player");
+            }
+        } else {
+            window.showAuthPage();
+        }
+    });
+
+    window.logoutUser = async function() {
+        if(confirm("Apakah Anda yakin ingin keluar dari akun?")) {
+            await signOut(window.auth);
+            localStorage.removeItem('nusaCraft_sessionUser');
+            window.showAuthPage();
+        }
+    };
+</script>
+
 <script>
 
 function openVairooYT(){window.open("https://youtube.com/@vairoo-n2o1n?si=-6Uu7o39nHAOLX59","_blank");}
@@ -714,13 +814,12 @@ link.click();
 document.body.removeChild(link);
 }
 
-    // --- ID SPREADSHEET DATABASE ---
+    // --- SPREADSHEET ENGINE DATABASE ---
     const SPREADSHEET_ID = '1Jmd_jLPnz87sWQ5xtzhHMUCkzLwtyu4eCQLgVm3Z77k'; 
     const PERATURAN_SHEET_ID = '1Ex-R3IPwQ3xpbJRI6H3IDYAN57hfeLnq3dmxG_LPaQs'; 
     const PEMENANG_SHEET_ID = '1-zI6EbcA_pfpwnaJxxSNu-PjNH7vIM-oLcH3tfyEBms'; 
     const NEWS_SHEET_ID = '1NYgujVLQES0s671JfWMezXZOGchWvYCfCDCADA0ouEU';
     
-    // --- PENTING: ISI DENGAN URL WEB APP DARI GOOGLE APPS SCRIPT KAMU ---
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxa0BObX9C29IZ_LjUCPIk3WVabbYTfI9rFV2gaxED7ehDQVLG76beyG7BwwBVyqFlS/exec";
 
     const SHEETS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json`;
@@ -746,8 +845,14 @@ document.body.removeChild(link);
     const pemenangContainer = document.getElementById('pemenangContainer');
     const feedbackContainer = document.getElementById('feedbackContainer');
 
+    // --- DATA STATE PEMAIN ---
     let activeEventName = ""; 
     let userRegistered = new Set(); 
+    let clickerCoins = 0;
+    let clickPower = 1;
+    let upgradeCost = 50;
+    let highestSnakeScore = 0;
+    let savedNews = [];
     
     let eventFetchStatus = 'loading';
     let peraturanFetchStatus = 'loading';
@@ -766,9 +871,54 @@ document.body.removeChild(link);
     let peraturanHtml = '';
     let pemenangHtml = '';
     let countdownInterval = null;
-    let isLoginMode = true;
 
-    // --- Utility Function to Format the Raw Date String ---
+    // --- DEBOUNCED AUTOMATION SYNC ENGINE ---
+    let syncTimeout;
+    window.syncDataToFirebase = async function() {
+        if (!window.auth || !window.auth.currentUser) return;
+        const userRef = window.doc(window.db, "users", window.auth.currentUser.uid);
+        try {
+            await window.updateDoc(userRef, {
+                coins: clickerCoins,
+                clickPower: clickPower,
+                upgradeCost: upgradeCost,
+                snakeHigh: highestSnakeScore,
+                savedNews: savedNews,
+                registeredEvents: Array.from(userRegistered)
+            });
+            console.log("☁️ Progress tersimpan permanen di Cloud.");
+        } catch (error) {
+            console.error("Gagal sinkron cloud:", error);
+        }
+    };
+
+    window.debouncedSync = function() {
+        clearTimeout(syncTimeout);
+        syncTimeout = setTimeout(() => {
+            window.syncDataToFirebase();
+        }, 1200);
+    };
+
+    window.initializeAppWithUserData = function(data, username) {
+        clickerCoins = data.coins || 0;
+        clickPower = data.clickPower || 1;
+        upgradeCost = data.upgradeCost || 50;
+        highestSnakeScore = data.snakeHigh || 0;
+        savedNews = data.savedNews || [];
+        userRegistered = new Set(data.registeredEvents || []);
+        
+        localStorage.setItem('nusaCraft_sessionUser', username);
+        toolbarUser.innerText = username;
+        document.getElementById('playerAvatar').src = `https://minotar.net/helm/${username}/16.png`;
+        
+        updateClickerUI();
+        
+        const cached = localStorage.getItem('nusaCraft_cache_events_raw');
+        if (cached) buildEventCache(JSON.parse(cached));
+        
+        showMainPage();
+    };
+
     function formatRawDateString(rawDateStr) {
         if (!rawDateStr || !rawDateStr.startsWith('Date(') || !rawDateStr.endsWith(')')) { return rawDateStr; }
         try {
@@ -782,10 +932,7 @@ document.body.removeChild(link);
             const hh = String(dateObj.getHours()).padStart(2, '0');
             const min = String(dateObj.getMinutes()).padStart(2, '0');
             return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
-        } catch (e) {
-            console.error('Error formatting date:', e);
-            return rawDateStr;
-        }
+        } catch (e) { return rawDateStr; }
     }
 
     function getCellString(cell, fallback = '') {
@@ -805,113 +952,6 @@ document.body.removeChild(link);
         return fallback;
     }
 
-    function togglePasswordVisibility(inputId, element) {
-        const passwordInput = document.getElementById(inputId);
-        if (passwordInput.type === "password") {
-            passwordInput.type = "text";
-            element.innerText = "🙈";
-        } else {
-            passwordInput.type = "password";
-            element.innerText = "👁️";
-        }
-    }
-
-    function toggleAuthMode() {
-        isLoginMode = !isLoginMode;
-        const authTitleText = document.getElementById('authTitleText');
-        const confirmWrapper = document.getElementById('confirmPasswordWrapper');
-        const btnAuthAction = document.getElementById('btnAuthAction');
-        const authSwitchBtn = document.getElementById('authSwitchBtn');
-        
-        document.getElementById('authUsername').value = '';
-        document.getElementById('authPassword').value = '';
-        document.getElementById('authPasswordConfirm').value = '';
-        
-        document.getElementById('authPassword').type = "password";
-        document.getElementById('authPasswordConfirm').type = "password";
-        document.querySelectorAll('.auth-container span').forEach(el => el.innerText = "👁️");
-
-        if (isLoginMode) {
-            authTitleText.innerText = "Login Akun Server";
-            confirmWrapper.style.display = "none";
-            btnAuthAction.innerText = "MASUK GAME";
-            authSwitchBtn.innerHTML = "Belum punya akun? <b>Daftar di sini</b>";
-        } else {
-            authTitleText.innerText = "Registrasi Akun Baru";
-            confirmWrapper.style.display = "block";
-            btnAuthAction.innerText = "DAFTAR AKUN";
-            authSwitchBtn.innerHTML = "Sudah punya akun? <b>Login di sini</b>";
-        }
-    }
-
-    function loadUserRegistered(username) {
-        if (username) {
-            userRegistered = new Set(JSON.parse(localStorage.getItem(`nusaCraft_registered_${username.toLowerCase()}`)) || []);
-        } else {
-            userRegistered = new Set();
-        }
-    }
-
-    function handleAuth() {
-        const username = document.getElementById('authUsername').value.trim();
-        const password = document.getElementById('authPassword').value;
-        const confirmPassword = document.getElementById('authPasswordConfirm').value;
-
-        if (!username || !password) {
-            alert("⚠️ Username dan Password tidak boleh kosong!");
-            return;
-        }
-
-        let accounts = JSON.parse(localStorage.getItem('nusaCraft_accounts')) || {};
-
-        if (isLoginMode) {
-            if (accounts[username.toLowerCase()] && accounts[username.toLowerCase()] === password) {
-                const btnAuthAction = document.getElementById('btnAuthAction');
-                const originalText = btnAuthAction.innerText;
-                btnAuthAction.innerText = "MEMVERIFIKASI...";
-                
-                setTimeout(() => {
-                    localStorage.setItem('nusaCraft_sessionUser', username);
-                    toolbarUser.innerText = username;
-                    document.getElementById('playerAvatar').src = `https://minotar.net/helm/${username}/16.png`;
-                    
-                    loadGameStats(); 
-                    loadUserRegistered(username);
-                    
-                    const cached = localStorage.getItem('nusaCraft_cache_events_raw');
-                    if (cached) buildEventCache(JSON.parse(cached));
-
-                    alert(`✨ Login Berhasil! Selamat datang di dashboard, ${username}.`);
-                    btnAuthAction.innerText = originalText;
-                    showMainPage();
-                }, 150);
-            } else {
-                alert("❌ Username atau Password salah! Periksa kembali data Anda.");
-            }
-        } else {
-            if (password !== confirmPassword) {
-                alert("⚠️ Password konfirmasi tidak sesuai!");
-                return;
-            }
-            if (accounts[username.toLowerCase()]) {
-                alert("⚠️ Username ini sudah terdaftar. Silakan gunakan nama lain.");
-                return;
-            }
-            
-            const btnAuthAction = document.getElementById('btnAuthAction');
-            const originalText = btnAuthAction.innerText;
-            btnAuthAction.innerText = "MENDAFTARKAN...";
-            
-            setTimeout(() => {
-                accounts[username.toLowerCase()] = password;
-                localStorage.setItem('nusaCraft_accounts', JSON.stringify(accounts));
-                alert("✅ Akun berhasil didaftarkan! Silakan login menggunakan akun tersebut.");
-                btnAuthAction.innerText = originalText;
-                toggleAuthMode();
-            }, 150);
-        }
-    }
-
     function renderPlayerFeedbacks() {
         if (playerFeedbacks.length === 0) {
             feedbackContainer.innerHTML = '<div class="loading-text">Belum ada feedback dari player saat ini. Tulis feedback pertamamu!</div>';
@@ -921,7 +961,7 @@ document.body.removeChild(link);
         let html = '';
         playerFeedbacks.forEach((fb, index) => {
             html += `
-                <div class="event-card feedback-card-item" data-index="${index}" style="padding: 16px; border-color: rgba(255,255,255,0.04); margin-bottom: 12px; cursor: pointer; user-select: none; -webkit-user-select: none; background: #111827;">
+                <div class="event-card feedback-card-item" data-index="${index}" style="padding: 16px; border-color: rgba(255,255,255,0.04); margin-bottom: 12px; cursor: pointer; user-select: none; background: #111827;">
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 8px;">
                         <span style="color: #fbbf24; font-weight: bold;">👤 ${fb.username}</span>
                         <span style="color: #6b7280; font-size: 11px;">${fb.waktu}</span>
@@ -1019,7 +1059,7 @@ document.body.removeChild(link);
             jsonString = jsonString.replace(/:\s*(?:new\s+)?Date\(([\d,\s]+)\)/g, ':"Date($1)"');
             return JSON.parse(jsonString);
         }
-        throw new Error("Format respon Google Sheets tidak valid. Pastikan file sudah dipublikasikan.");
+        throw new Error("Format database gagal.");
     }
 
     function parseAndFormatDate(dateStr) {
@@ -1083,7 +1123,7 @@ document.body.removeChild(link);
                         const judul = getCellString(cells[0], '');
                         const isi = getCellString(cells[1], '');
                         const tanggal = getCellString(cells[2], '');
-                        const kategori = getCellString(cells[3], 'Umum'); // Ambil dari kolom D (index ke-3)
+                        const kategori = getCellString(cells[3], 'Umum');
                         const url = getCellString(cells[4], '');
                         
                         if (judul) {
@@ -1104,22 +1144,15 @@ document.body.removeChild(link);
             });
     }
 
-    // renderNews sudah dipindah dan di-override di script bagian bawah
     function renderNews() {}
-
     function openNewsPage() {
         hideAllPages();
         newsListPage.style.display = 'block';
         newsListPage.classList.add('page-transition');
         window.scrollTo(0, 0);
     }
-
-    // openNewsDetail sudah dipindah dan di-override di script bagian bawah
     function openNewsDetail(i) {}
-
-    function closeNews() {
-        showMainPage();
-    }
+    function closeNews() { showMainPage(); }
 
     function fetchParticipantsData() {
         fetch(PESERTA_URL)
@@ -1755,7 +1788,7 @@ document.body.removeChild(link);
         const eventKey = activeEventName.toLowerCase().trim();
 
         if (WEB_APP_URL.includes("URL_GOOGLE_SCRIPT_KAMU")) {
-            alert("⚠️ Sistem Belum Siap! Harap isi variabel WEB_APP_URL di dalam kode script HTML dengan URL dari Apps Script Google milikmu terlebih dahulu.");
+            alert("⚠️ Sistem Belum Siap! Harap isi variabel WEB_APP_URL.");
             btnAction.innerText = originalText;
             btnAction.disabled = false;
             return;
@@ -1769,10 +1802,7 @@ document.body.removeChild(link);
         .then(resData => {
             if (resData.status === "success") {
                 userRegistered.add(activeEventName);
-                const currentActiveUser = localStorage.getItem('nusaCraft_sessionUser');
-                if (currentActiveUser) {
-                    localStorage.setItem(`nusaCraft_registered_${currentActiveUser.toLowerCase()}`, JSON.stringify(Array.from(userRegistered)));
-                }
+                window.debouncedSync(); // Sinkron status pendaftaran ke Firebase Cloud
 
                 document.getElementById('successDetails').innerHTML = `
                     <div style="margin-bottom: 4px; color:#6b7280; font-size: 12px;">Nama In-Game:</div>
@@ -1832,12 +1862,8 @@ document.body.removeChild(link);
     function showAuthPage() {
         hideAllPages();
         document.getElementById('authPage').style.display = 'block';
-        document.getElementById('authUsername').value = '';
-        document.getElementById('authPassword').value = '';
-        document.getElementById('authPasswordConfirm').value = '';
-        localStorage.removeItem('nusaCraft_sessionUser');
-        loadUserRegistered(null); 
-        if(!isLoginMode) toggleAuthMode();
+        clickerCoins = 0; clickPower = 1; upgradeCost = 50; highestSnakeScore = 0;
+        savedNews = []; userRegistered.clear();
     }
 
     function showMainPage() { 
@@ -1943,9 +1969,9 @@ document.body.removeChild(link);
                         const dateParts = parts[0].split('/');
                         if (dateParts.length === 3) {
                             const timeParts = parts[1] ? parts[1].split(':') : [0, 0, 0];
-                            if (dateParts[2].length === 4) { // DD/MM/YYYY
+                            if (dateParts[2].length === 4) { 
                                 targetDate = new Date(dateParts[2], dateParts[1] - 1, dateParts[0], timeParts[0] || 0, timeParts[1] || 0, timeParts[2] || 0).getTime();
-                            } else if (dateParts[0].length === 4) { // YYYY/MM/DD
+                            } else if (dateParts[0].length === 4) { 
                                 targetDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2], timeParts[0] || 0, timeParts[1] || 0, timeParts[2] || 0).getTime();
                             }
                         }
@@ -1979,42 +2005,6 @@ document.body.removeChild(link);
         countdownInterval = setInterval(executeCountdown, 1000);
     }
 
-    let clickerCoins = 0;
-    let clickPower = 1;
-    let upgradeCost = 50;
-    let highestSnakeScore = 0;
-
-    function loadGameStats() {
-        const user = localStorage.getItem('nusaCraft_sessionUser');
-        if (!user) return;
-        
-        let stats = JSON.parse(localStorage.getItem('nc_stats_' + user.toLowerCase()));
-        if (stats) {
-            clickerCoins = stats.coins || 0;
-            clickPower = stats.power || 1;
-            upgradeCost = stats.cost || 50;
-            highestSnakeScore = stats.snakeHigh || 0;
-        } else {
-            clickerCoins = 0;
-            clickPower = 1;
-            upgradeCost = 50;
-            highestSnakeScore = 0;
-        }
-    }
-
-    function saveGameStats() {
-        const user = localStorage.getItem('nusaCraft_sessionUser');
-        if (!user) return;
-        
-        const stats = {
-            coins: clickerCoins,
-            power: clickPower,
-            cost: upgradeCost,
-            snakeHigh: highestSnakeScore
-        };
-        localStorage.setItem('nc_stats_' + user.toLowerCase(), JSON.stringify(stats));
-    }
-
     function updateClickerUI() {
         document.getElementById('clickerCoins').innerText = clickerCoins + " 🪙";
         document.getElementById('clickerPower').innerText = "Daya Hancur: " + clickPower + " Block/Klik";
@@ -2023,8 +2013,8 @@ document.body.removeChild(link);
 
     function handleBlockClick(event) {
         clickerCoins += clickPower;
-        saveGameStats();
         updateClickerUI();
+        window.debouncedSync(); 
 
         const block = document.getElementById('clickTargetBlock');
         block.style.transform = 'scale(0.9)';
@@ -2037,9 +2027,7 @@ document.body.removeChild(link);
         floatingCoin.style.top = (event.clientY - 20) + 'px';
         document.body.appendChild(floatingCoin);
         
-        setTimeout(() => {
-            floatingCoin.remove();
-        }, 600);
+        setTimeout(() => { floatingCoin.remove(); }, 600);
     }
 
     function buyClickerUpgrade() {
@@ -2047,8 +2035,8 @@ document.body.removeChild(link);
             clickerCoins -= upgradeCost;
             clickPower += 1;
             upgradeCost = Math.floor(upgradeCost * 1.5);
-            saveGameStats();
             updateClickerUI();
+            window.debouncedSync();
         } else {
             alert("⚠️ Koin tidak cukup untuk upgrade! Lanjut mining lagi.");
         }
@@ -2135,7 +2123,7 @@ document.body.removeChild(link);
             document.getElementById('snakeScore').innerText = snakeScore;
             if (snakeScore > highestSnakeScore) {
                 highestSnakeScore = snakeScore;
-                saveGameStats();
+                window.debouncedSync(); 
             }
             placeSnakeFood();
         } else {
@@ -2172,56 +2160,20 @@ document.body.removeChild(link);
         backToGameHub();
     }
 
-    // --- INISIALISASI APLIKASI ---
-    window.addEventListener('DOMContentLoaded', () => {
-        const sessionUser = localStorage.getItem('nusaCraft_sessionUser');
-        if (sessionUser) {
-            toolbarUser.innerText = sessionUser;
-            document.getElementById('playerAvatar').src = `https://minotar.net/helm/${sessionUser}/16.png`;
-            loadUserRegistered(sessionUser);
-            loadGameStats();
-            showMainPage();
-        } else {
-            showAuthPage();
-        }
-    });
-
     async function loadServerStatus(){
         try{
-            const response=await fetch(
-            "https://api.mcsrvstat.us/bedrock/2/basic-1.mineidhost.icu:19159"
-            );
-            const data=await response.json();
-            
-            data.online ? "🟢 Online":"🔴 Offline";
-            
-            `👥 ${data.players.online}/${data.players.max}`;
-            
-            `📶 ${data.debug?.ping || "--"} ms`;
-            
-            "⚡ 20 TPS";
-        }catch{
-            "🔴 Offline";
-            
-            "👥 --/--";
-            
-            "📶 --";
-            
-            "⚡ --";
-        }
+            await fetch("https://api.mcsrvstat.us/bedrock/2/basic-1.mineidhost.icu:19159");
+        }catch(e){}
     }
-    
     loadServerStatus();
-    setInterval(loadServerStatus,5000);
+    setInterval(loadServerStatus,10000);
 
 </script>
 
 <style>
 .news-search{background:#0f172a;border-radius:18px;padding:14px;display:flex;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.05);margin-bottom:14px}
-.news-search input{flex:1;background:transparent;border:none;color:#fff;outline:none;font-family: 'Plus Jakarta Sans', sans-serif;}
-.news-search:focus-within{box-shadow:0 0 20px rgba(245,158,11,.35)}
+.news-search input{flex:1;background:transparent;border:none;color:#fff;outline:none;}
 
-/* Perbaikan overflow & spacing kategori */
 .news-cats {
     display: flex;
     overflow-x: auto;
@@ -2230,9 +2182,7 @@ document.body.removeChild(link);
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
 }
-.news-cats::-webkit-scrollbar {
-    display: none;
-}
+.news-cats::-webkit-scrollbar { display: none; }
 .news-cats div {
     padding: 8px 14px;
     background: #111827;
@@ -2279,38 +2229,26 @@ function setCat(el){
     renderNews();
 }
 
-let savedNews = JSON.parse(localStorage.getItem('savedNews')||'[]');
-
 renderNews = function(){
     const c=document.getElementById('googleNewsContainer');
     if(newsFetchStatus==='loading'){c.innerHTML='<div class=skeleton></div><div class=skeleton></div>';return;}
     
-    // SINKRONISASI: Jika berita sudah tidak ada di Sheet, otomatis hapus dari Favorit
     if(allNewsData && allNewsData.length > 0) {
         let valid = savedNews.filter(x => allNewsData.some(y => y.judul === x.judul));
         if(valid.length !== savedNews.length) {
             savedNews = valid;
-            localStorage.setItem('savedNews', JSON.stringify(savedNews));
+            window.debouncedSync(); 
         }
     }
 
-    // Filter pencarian teks judul
     let data = allNewsData.filter(n=>n.judul.toLowerCase().includes(newsKeyword));
     
-    // Filter Kategori (Kolom D) Pintar Case-Insensitive & Space-Insensitive
     if(newsCat !== 'Terbaru') {
         data = data.filter(n => {
             let kat = n.kategori ? n.kategori.toLowerCase().replace(/\s+/g, '').trim() : "umum";
             const listKategoriSistem = ['nusacraft', 'event', 'update', 'game', 'maintenance', 'komunitas'];
-            
-            if(kat === 'nusa' || kat === 'craft' || kat === 'nusacraft') {
-                kat = 'nusacraft';
-            }
-            
-            if (!listKategoriSistem.includes(kat) || kat === 'umum' || kat === '') {
-                kat = 'umum';
-            }
-            
+            if(kat === 'nusa' || kat === 'craft' || kat === 'nusacraft') kat = 'nusacraft';
+            if (!listKategoriSistem.includes(kat) || kat === 'umum' || kat === '') kat = 'umum';
             return kat === newsCat.toLowerCase();
         });
     }
@@ -2345,7 +2283,6 @@ openNewsDetail = (i) => {
     window.currentNews=n;
     
     document.getElementById('detailNewsTitle').innerText = n.judul;
-    
     let tagLabel = n.kategori ? n.kategori : 'Umum';
     document.getElementById('detailNewsDate').innerText = '📅 ' + n.tanggal + ' • ⭐ ' + tagLabel;
     document.getElementById('detailNewsContent').innerText = n.isi;
@@ -2376,7 +2313,6 @@ openNewsDetail = (i) => {
     window.scrollTo(0, 0);
 }
 
-// FITUR BARU: Menyalin berita dari tombol di card & Favorit
 window.salinBeritaText = function(event, index) {
     if(event) event.stopPropagation();
     let n = allNewsData[index];
@@ -2389,7 +2325,6 @@ window.salinBeritaText = function(event, index) {
     });
 };
 
-// FITUR BARU: Menyimpan berita dari tombol luar card
 window.toggleSaveNewsFromCard = function(event, index) {
     if(event) event.stopPropagation();
     let n = allNewsData[index];
@@ -2401,9 +2336,9 @@ window.toggleSaveNewsFromCard = function(event, index) {
     } else {
         savedNews.push(n);
     }
-    localStorage.setItem('savedNews', JSON.stringify(savedNews));
+    window.debouncedSync(); 
     updateSaveButton(); 
-    renderNews(); // Render ulang agar UI card list menyesuaikan state tersimpan
+    renderNews(); 
 };
 
 function toggleSaveNews(){
@@ -2415,7 +2350,7 @@ function toggleSaveNews(){
     }else{
         savedNews.push(window.currentNews);
     }
-    localStorage.setItem('savedNews',JSON.stringify(savedNews));
+    window.debouncedSync(); 
     updateSaveButton();
     renderNews(); 
 }
@@ -2436,16 +2371,13 @@ function copyNewsUrl(){
     }
 }
 
-// FITUR BARU: Membuka Menu Favorit yang ter-synchronize & UI baru
 function openSavedNews(){
     hideAllPages();
     newsListPage.style.display='block';
     let c=document.getElementById('googleNewsContainer');
     
-    // SINKRONISASI PADA SAAT BUKA FAVORIT
     let valid=savedNews.filter(x=>allNewsData.some(y=>y.judul===x.judul));
     savedNews=valid;
-    localStorage.setItem('savedNews',JSON.stringify(savedNews));
     
     c.innerHTML=valid.length?valid.map(x=>{
         let originalIndex = allNewsData.findIndex(y=>y.judul===x.judul);
@@ -2463,23 +2395,21 @@ function openSavedNews(){
     }).join('') : '<div class="loading-text" style="text-align:center; padding: 40px;">Belum ada berita favorit yang tersimpan.</div>'; 
 }
 
-// Fungsi membiarkan support code lama tetap hidup
 function removeSaved(j){
     savedNews=savedNews.filter(x=>x.judul!==j);
-    localStorage.setItem('savedNews',JSON.stringify(savedNews));
+    window.debouncedSync();
     openSavedNews();
 }
 
-// Fungsi baru untuk menghapus item spesifik menggunakan index tanpa masalah parse quote
 window.removeSavedByIndex = function(index, event) {
     if(event) event.stopPropagation();
     let n = allNewsData[index];
     if(!n) return;
     savedNews = savedNews.filter(x => x.judul !== n.judul);
-    localStorage.setItem('savedNews', JSON.stringify(savedNews));
+    window.debouncedSync(); 
     updateSaveButton();
     openSavedNews();
-    renderNews(); // Update UI background list
+    renderNews(); 
 };
 </script>
 </body>
