@@ -813,86 +813,100 @@
 
     const provider = new GoogleAuthProvider();
 
+    // UTIL: Timeout Wrapper
+    const withTimeout = (promise, ms) => {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), ms))
+        ]);
+    };
+
     window.loginDenganGoogle = async function() {
         const btn = document.getElementById('btnGoogleAuth');
         const originalText = btn.innerText;
         btn.innerText = "MENGHUBUNGKAN...";
         
         try {
-            const result = await signInWithPopup(window.auth, provider);
-            const user = result.user;
-            
-            const userRef = window.doc(window.db, "users", user.uid);
-            const docSnap = await window.getDoc(userRef);
+            const loginTask = async () => {
+                const result = await signInWithPopup(window.auth, provider);
+                const user = result.user;
+                const userRef = window.doc(window.db, "users", user.uid);
+                const docSnap = await window.getDoc(userRef);
 
-            if (docSnap.exists()) {
-                const dbData = docSnap.data();
-                // Migrasi schema lama ke baru jika perlu
-                if (!dbData.profiles) {
-                    await migrateOldSchema(userRef, dbData, user);
+                let justCreated = false;
+                
+                if (docSnap.exists()) {
+                    let dbData = docSnap.data();
+                    if (!dbData.profiles || Object.keys(dbData.profiles).length === 0) {
+                        dbData = await autoCreateFirstProfile(userRef, dbData, user);
+                        justCreated = true;
+                    }
+                    return { data: dbData, user: user, justCreated };
                 } else {
-                    window.initializeAppWithUserData(dbData, user);
+                    const newAccountSchema = {
+                        uid: user.uid, email: user.email, createdAt: new Date().toISOString(),
+                        activeProfileId: null, profiles: {},
+                        settings: { theme: 'dark', fontSize: 'medium' },
+                        gameData: { coins: 0, clickPower: 1, upgradeCost: 50, snakeHigh: 0, savedNews: [], registeredEvents: [] }
+                    };
+                    const newData = await autoCreateFirstProfile(userRef, newAccountSchema, user);
+                    return { data: newData, user: user, justCreated: true };
                 }
-            } else {
-                // Schema Akun Baru
-                const newAccountSchema = {
-                    uid: user.uid,
-                    email: user.email,
-                    createdAt: new Date().toISOString(),
-                    activeProfileId: null,
-                    profiles: {},
-                    settings: { theme: 'dark', fontSize: 'medium' },
-                    gameData: { coins: 0, clickPower: 1, upgradeCost: 50, snakeHigh: 0, savedNews: [], registeredEvents: [] }
-                };
-                await window.setDoc(userRef, newAccountSchema);
-                window.initializeAppWithUserData(newAccountSchema, user);
-            }
+            };
+
+            const response = await withTimeout(loginTask(), 5000);
+            window.isGuest = false;
+            window.initializeAppWithUserData(response.data, response.user, response.justCreated);
+
         } catch (error) {
-            console.error("Auth Error:", error);
-            if(error.code !== "auth/popup-closed-by-user") alert("⚠️ Gagal masuk: " + error.message);
+            console.error("Auth Error/Timeout:", error);
+            if(error.code !== "auth/popup-closed-by-user") {
+                // FALLBACK: Sesi Tamu Jika Error/Timeout
+                window.startGuestSession();
+            }
         } finally {
             if(btn) btn.innerText = originalText;
         }
     };
 
-    async function migrateOldSchema(userRef, oldData, user) {
-        let cleanName = user.displayName ? user.displayName.split(' ')[0].replace(/[^a-zA-Z0-9_]/g, '') : "Player";
-        if(cleanName === '') cleanName = "Player";
-        
+    async function autoCreateFirstProfile(userRef, baseData, user) {
+        let cleanName = window.generateRandomNameStr();
+        let randomAvatar = window.defaultAvatars[Math.floor(Math.random() * window.defaultAvatars.length)];
         const defaultProfileId = 'prof_' + Date.now();
-        const migratedData = {
-            uid: user.uid,
-            email: user.email,
-            createdAt: oldData.createdAt || new Date().toISOString(),
-            activeProfileId: defaultProfileId,
-            profiles: {
-                [defaultProfileId]: { id: defaultProfileId, name: oldData.username || cleanName, avatar: `https://minotar.net/helm/${cleanName}/100.png`, createdAt: new Date().toISOString() }
-            },
-            settings: { theme: 'dark', fontSize: 'medium' },
-            gameData: {
-                coins: oldData.coins || 0,
-                clickPower: oldData.clickPower || 1,
-                upgradeCost: oldData.upgradeCost || 50,
-                snakeHigh: oldData.snakeHigh || 0,
-                savedNews: oldData.savedNews || [],
-                registeredEvents: oldData.registeredEvents || []
-            }
+        
+        baseData.activeProfileId = defaultProfileId;
+        baseData.profiles = {
+            [defaultProfileId]: { id: defaultProfileId, name: cleanName, avatar: randomAvatar, createdAt: new Date().toISOString() }
         };
-        await window.setDoc(userRef, migratedData);
-        window.initializeAppWithUserData(migratedData, user);
+        
+        await window.setDoc(userRef, baseData, { merge: true });
+        return baseData;
     }
 
     onAuthStateChanged(window.auth, async (user) => {
         if (user) {
-            const userRef = window.doc(window.db, "users", user.uid);
-            const docSnap = await window.getDoc(userRef);
-            if (docSnap.exists()) {
-                const dbData = docSnap.data();
-                if (!dbData.profiles) {
-                    await migrateOldSchema(userRef, dbData, user);
-                } else {
-                    window.initializeAppWithUserData(dbData, user);
-                }
+            try {
+                const fetchTask = async () => {
+                    const userRef = window.doc(window.db, "users", user.uid);
+                    const docSnap = await window.getDoc(userRef);
+                    if (docSnap.exists()) {
+                        let dbData = docSnap.data();
+                        let justCreated = false;
+                        if (!dbData.profiles || Object.keys(dbData.profiles).length === 0) {
+                            dbData = await autoCreateFirstProfile(userRef, dbData, user);
+                            justCreated = true;
+                        }
+                        return { data: dbData, justCreated };
+                    }
+                    throw new Error("No data found");
+                };
+
+                const res = await withTimeout(fetchTask(), 5000);
+                window.isGuest = false;
+                window.initializeAppWithUserData(res.data, user, res.justCreated);
+            } catch (error) {
+                console.error("Auto Login Error:", error);
+                window.startGuestSession();
             }
         } else {
             if(window.showAuthPage) window.showAuthPage();
@@ -902,7 +916,9 @@
     window.logoutUser = async function() {
         if(confirm("Apakah Anda yakin ingin keluar dari akun?")) {
             await signOut(window.auth);
-            localStorage.removeItem('nusaCraft_sessionUser');
+            accountData = null;
+            currentProfiles = {};
+            activeProfileId = null;
             if(window.showAuthPage) window.showAuthPage();
         }
     };
@@ -912,12 +928,9 @@
         let confirmation = prompt("⚠️ PERINGATAN! Tindakan ini akan MENGHAPUS PERMANEN seluruh koin, profile, dan data Anda. Ketik 'HAPUS' untuk melanjutkan:");
         if (confirmation === 'HAPUS') {
             try {
-                // Delete user document
                 await window.deleteDoc(window.doc(window.db, "users", window.auth.currentUser.uid));
-                // Delete auth
                 await window.deleteUser(window.auth.currentUser);
                 alert("✅ Akun berhasil dihapus permanen.");
-                localStorage.clear();
                 window.location.reload();
             } catch (error) {
                 console.error("Delete Error:", error);
@@ -938,12 +951,11 @@
 let accountData = null;
 let currentProfiles = {};
 let activeProfileId = null;
-let editingProfileId = null; // null if creating new
+let editingProfileId = null;
 
 const MAX_PROFILES = 5;
 
-// DEFAULT AVATARS
-const defaultAvatars = [
+window.defaultAvatars = [
     "https://minotar.net/helm/Steve/100.png", "https://minotar.net/helm/Alex/100.png",
     "https://minotar.net/helm/Dream/100.png", "https://minotar.net/helm/Technoblade/100.png",
     "https://minotar.net/helm/Grian/100.png", "https://minotar.net/helm/MumboJumbo/100.png",
@@ -956,22 +968,44 @@ const defaultAvatars = [
     "https://minotar.net/helm/Sapnap/100.png", "https://minotar.net/helm/PewDiePie/100.png"
 ];
 
-// RANDOM NAME GENERATOR
 const namePrefixes = ["Shadow", "Nusa", "Dark", "Sky", "Red", "Golden", "Storm", "Pixel", "Alpha", "Night", "Frost", "Mystic", "Titan", "Nova", "Void", "Iron", "Cyber", "Ender"];
 const nameSuffixes = ["Hunter", "Warrior", "Knight", "Legend", "Dragon", "Craft", "Player", "Hero", "Wolf", "Rider", "King", "Master", "Play", "Gamer", "Ninja", "Blade"];
 
-function generateRandomName() {
+window.generateRandomNameStr = function() {
     let p = namePrefixes[Math.floor(Math.random() * namePrefixes.length)];
     let s = nameSuffixes[Math.floor(Math.random() * nameSuffixes.length)];
-    document.getElementById('profileNameInput').value = p + s;
+    let num = Math.floor(100 + Math.random() * 900); // 3 Digit Random
+    return p + s + num;
+};
+
+function generateRandomName() {
+    document.getElementById('profileNameInput').value = window.generateRandomNameStr();
 }
 
-window.initializeAppWithUserData = function(data, authUser) {
+// FALLBACK SESSION
+window.startGuestSession = function() {
+    console.warn("Using Guest Session Fallback");
+    let guestId = 'guest_' + Date.now();
+    let guestName = window.generateRandomNameStr();
+    let guestAvatar = window.defaultAvatars[Math.floor(Math.random() * window.defaultAvatars.length)];
+    
+    accountData = {
+        uid: 'guest', email: 'guest@local', activeProfileId: guestId,
+        profiles: { [guestId]: { id: guestId, name: guestName, avatar: guestAvatar, createdAt: new Date().toISOString() } },
+        settings: { theme: 'dark', fontSize: 'medium' },
+        gameData: { coins: 0, clickPower: 1, upgradeCost: 50, snakeHigh: 0, savedNews: [], registeredEvents: [] }
+    };
+    currentProfiles = accountData.profiles;
+    window.isGuest = true; 
+    
+    selectProfile(guestId);
+};
+
+window.initializeAppWithUserData = function(data, authUser, justCreated = false) {
     accountData = data;
     currentProfiles = data.profiles || {};
     activeProfileId = data.activeProfileId;
     
-    // Bind Game Data
     let gd = data.gameData || {};
     clickerCoins = gd.coins || 0;
     clickPower = gd.clickPower || 1;
@@ -980,7 +1014,6 @@ window.initializeAppWithUserData = function(data, authUser) {
     savedNews = gd.savedNews || [];
     userRegistered = new Set(gd.registeredEvents || []);
     
-    // Apply Settings
     if (data.settings) {
         document.getElementById('toggleDarkMode').checked = (data.settings.theme === 'dark');
         toggleTheme(document.getElementById('toggleDarkMode'));
@@ -990,8 +1023,10 @@ window.initializeAppWithUserData = function(data, authUser) {
 
     document.getElementById('set_email').innerText = data.email || (authUser ? authUser.email : '-');
 
-    if (Object.keys(currentProfiles).length > 0) {
-        showProfileSelection();
+    if (justCreated && activeProfileId) {
+        selectProfile(activeProfileId); // Otomatis Menu Utama
+    } else if (Object.keys(currentProfiles).length > 0) {
+        showProfileSelection(); // Tampilkan Pilihan Profile
     } else {
         openCreateProfileModal();
     }
@@ -1028,15 +1063,12 @@ function renderProfileGrid() {
 
 function selectProfile(id) {
     activeProfileId = id;
-    accountData.activeProfileId = id;
-    window.debouncedSyncAccount(); // Simpan pilihan ke cloud
+    if(accountData) accountData.activeProfileId = id;
+    window.debouncedSyncAccount(); 
     
-    // Update global UI
     let p = currentProfiles[id];
-    localStorage.setItem('nusaCraft_sessionUser', p.name);
     document.getElementById('toolbarProfileName').innerText = p.name;
     document.getElementById('toolbarAvatar').src = p.avatar;
-    
     document.getElementById('set_activeName').innerText = p.name;
     document.getElementById('set_activeAvatar').src = p.avatar;
 
@@ -1046,12 +1078,11 @@ function selectProfile(id) {
     if (cached) buildEventCache(JSON.parse(cached));
 }
 
-// ================= MODAL PROFILE (CREATE/EDIT) =================
 let selectedAvatarUrl = "";
 
 function renderAvatarSelection() {
     let html = '';
-    defaultAvatars.forEach(url => {
+    window.defaultAvatars.forEach(url => {
         let sel = (url === selectedAvatarUrl) ? 'selected' : '';
         html += `<div class="avatar-item ${sel}" onclick="chooseAvatar('${url}')"><img src="${url}"></div>`;
     });
@@ -1067,7 +1098,6 @@ function handleAvatarUpload(event) {
     const file = event.target.files[0];
     if(!file) return;
     
-    // Resize with Canvas to save base64 space
     const reader = new FileReader();
     reader.onload = function(e) {
         const img = new Image();
@@ -1078,7 +1108,6 @@ function handleAvatarUpload(event) {
             ctx.drawImage(img, 0, 0, 150, 150);
             const base64Str = canvas.toDataURL('image/jpeg', 0.8);
             
-            // Tambahkan ke grid sementara sbg pilihan
             selectedAvatarUrl = base64Str;
             document.getElementById('avatarSelectionGrid').innerHTML = `<div class="avatar-item selected"><img src="${base64Str}"></div>` + document.getElementById('avatarSelectionGrid').innerHTML;
         }
@@ -1093,7 +1122,7 @@ function openCreateProfileModal() {
     document.getElementById('profileNameInput').value = "";
     document.getElementById('btnDeleteProfile').style.display = "none";
     
-    selectedAvatarUrl = defaultAvatars[Math.floor(Math.random() * defaultAvatars.length)];
+    selectedAvatarUrl = window.defaultAvatars[Math.floor(Math.random() * window.defaultAvatars.length)];
     renderAvatarSelection();
     
     document.getElementById('profileModal').style.display = 'flex';
@@ -1140,10 +1169,10 @@ function saveProfile() {
     window.debouncedSyncAccount();
     closeProfileModal();
     
-    if(!editingProfileId) { // Jika baru bikin
+    if(!editingProfileId) { 
         selectProfile(pid); 
     } else {
-        selectProfile(activeProfileId); // Refresh UI
+        selectProfile(activeProfileId); 
     }
 }
 
@@ -1151,17 +1180,17 @@ function deleteCurrentProfile() {
     if(Object.keys(currentProfiles).length <= 1) { alert("Minimal harus ada 1 profile!"); return; }
     if(confirm("Yakin ingin menghapus profile ini?")) {
         delete currentProfiles[editingProfileId];
-        // Pilih profile lain sembarang
         activeProfileId = Object.keys(currentProfiles)[0];
         accountData.activeProfileId = activeProfileId;
         window.debouncedSyncAccount();
         closeProfileModal();
-        showProfileSelection(); // Balik ke menu pilih
+        showProfileSelection(); 
     }
 }
 
-// ================= CLOUD SYNC ENGINE =================
+// CLOUD SYNC ENGINE
 window.debouncedSyncAccount = function() {
+    if(window.isGuest) return; // Nonaktifkan sync jika masuk mode tamu/fallback
     clearTimeout(syncTimeout);
     syncTimeout = setTimeout(() => {
         if (!window.auth || !window.auth.currentUser) return;
@@ -1189,12 +1218,10 @@ window.debouncedSyncAccount = function() {
         }
     }, 1200);
 };
-// Overwrite old sync function to use new schema
+
 window.syncDataToFirebase = window.debouncedSyncAccount; 
 window.debouncedSync = window.debouncedSyncAccount;
 
-
-// ================= MENU NAVIGATION =================
 function hideAllPages() {
     const pages = ['authPage', 'profileSelectionPage', 'mainPage', 'eventPage', 'pemenangPage', 'peraturanPage', 'feedbackPage', 'gamePage', 'newsListPage', 'newsDetailPage', 'settingsPage'];
     pages.forEach(id => {
@@ -1229,12 +1256,10 @@ function showSettingsPage() {
     clearActiveNavs();
     document.getElementById('navSettings').classList.add('active');
 
-    // Update Live Stats
     document.getElementById('set_coins').innerText = clickerCoins;
     document.getElementById('set_snake').innerText = highestSnakeScore;
 }
 
-// Toggles & Settings Logic
 function toggleTheme(checkbox) {
     if(checkbox.checked) {
         document.body.classList.remove('light-mode');
@@ -1261,7 +1286,6 @@ function resetGameData() {
     }
 }
 
-// Override Open Event Modal -> Konfirmasi tanpa input text
 function openDaftarModal(namaEvent) {
     document.getElementById('eventTargetName').innerText = namaEvent;
     
@@ -1339,7 +1363,6 @@ function konfirmasiDaftarOtomatis() {
     });
 }
 
-// Define the other missing page openers that were overriden in hideAllPages
 function showMainPage() { 
     hideAllPages(); 
     document.getElementById('appToolbar').style.display = 'flex';
@@ -1542,7 +1565,7 @@ document.body.removeChild(link);
             return;
         }
 
-        const currentActiveUser = localStorage.getItem('nusaCraft_sessionUser') || 'Player';
+        const currentActiveUser = (activeProfileId && currentProfiles[activeProfileId]) ? currentProfiles[activeProfileId].name : 'Guest';
         const now = new Date();
         const tgl = String(now.getDate()).padStart(2, '0');
         const bln = String(now.getMonth() + 1).padStart(2, '0');
