@@ -279,7 +279,7 @@
         .modal-detail-banner-box { width: 100%; height: 130px; border-radius: 16px; overflow: hidden; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.06); position: relative; }
         .modal-detail-banner-box img { width: 100%; height: 100%; object-fit: cover; }
         
-        </style>
+    </style>
 </head>
 <body>
 
@@ -320,7 +320,7 @@
                 <div style="color: #9ca3af; font-size: 13px; margin-bottom: 24px; line-height: 1.5;">
                     Silakan masuk menggunakan akun Google Anda untuk mensinkronisasi progres game, koin, dan berita favorit Anda ke cloud secara otomatis.
                 </div>
-                <button class="btn-google" id="btnGoogleAuth" onclick="loginDenganGoogle()">
+                <button class="btn-google" id="btnGoogleAuth" onclick="window.loginDenganGoogle()">
                     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="google-icon" alt="Google">
                     Masuk dengan Google
                 </button>
@@ -418,7 +418,7 @@
                 <div class="title">NUSA CRAFT</div>
                 <div class="subtitle">Official Server Channel</div>
                 </div>
-                <div class="menu-card col-6" onclick="logoutUser()" style="min-height: 50px; background: rgba(239,68,68,0.05); border: 1px dashed rgba(239,68,68,0.2); color: #fca5a5; display: flex; justify-content: center; align-items: center; font-weight: 700; font-size: 12px; letter-spacing: 1px; border-radius: 16px; margin-top: 10px;">
+                <div class="menu-card col-6" onclick="window.logoutUser()" style="min-height: 50px; background: rgba(239,68,68,0.05); border: 1px dashed rgba(239,68,68,0.2); color: #fca5a5; display: flex; justify-content: center; align-items: center; font-weight: 700; font-size: 12px; letter-spacing: 1px; border-radius: 16px; margin-top: 10px;">
                     🚪 KELUAR AKUN GAME
                 </div>
             </div>
@@ -703,9 +703,9 @@
 </div>
 
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
-    import { getFirestore, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyDDM9R0bYZLdUTQoqzyiA2zH8eh16zH8Es",
@@ -726,11 +726,10 @@
     window.setDoc = setDoc;
     window.getDoc = getDoc;
     window.updateDoc = updateDoc;
-    window.firebaseReady = true;
 
     const provider = new GoogleAuthProvider();
 
-    // Fungsi Utama: Login Dengan Google Popup (Mode Produksi)
+    // Fungsi Utama: Login Dengan Google Popup
     window.loginDenganGoogle = async function() {
         const btn = document.getElementById('btnGoogleAuth');
         const originalText = btn.innerText;
@@ -740,16 +739,19 @@
             const result = await signInWithPopup(window.auth, provider);
             const user = result.user;
             
+            // 👉 LANGSUNG REDIRECT KE MENU UTAMA (Biar Instan & Tidak Stuck)
+            if (window.showMainPage) window.showMainPage();
+            
             const userRef = window.doc(window.db, "users", user.uid);
             const docSnap = await window.getDoc(userRef);
 
-            // Bersihkan DisplayName Google menjadi username simpel tanpa spasi untuk Minecraft skin template
+            // Bersihkan DisplayName Google menjadi username simpel
             let cleanName = user.displayName ? user.displayName.split(' ')[0].replace(/[^a-zA-Z0-9_]/g, '') : "Player";
             if(cleanName === '') cleanName = "Player";
 
             if (docSnap.exists()) {
                 const dbData = docSnap.data();
-                window.initializeAppWithUserData(dbData, dbData.username || cleanName);
+                if(window.initializeAppWithUserData) window.initializeAppWithUserData(dbData, dbData.username || cleanName);
             } else {
                 // Skema Dokumen Baru Pertama Kali Login
                 const newAccountSchema = {
@@ -763,16 +765,20 @@
                     createdAt: new Date().toISOString()
                 };
                 await window.setDoc(userRef, newAccountSchema);
-                window.initializeAppWithUserData(newAccountSchema, cleanName);
+                if(window.initializeAppWithUserData) window.initializeAppWithUserData(newAccountSchema, cleanName);
             }
-            alert(`✨ Selamat Datang Kembali, ${cleanName}! Data berhasil disinkronisasi.`);
+            alert(`✨ Selamat Datang, ${cleanName}!`);
         } catch (error) {
             console.error("Auth Error:", error);
             if(error.code === "auth/popup-blocked") {
-                alert("❌ Blokir Popup Terdeteksi! Mohon izinkan jendela popup pada pengaturan browser Anda agar dapat masuk dengan Google.");
+                alert("❌ Blokir Popup Terdeteksi! Mohon izinkan popup di browser Anda.");
+            } else if(error.code === "auth/unauthorized-domain") {
+                alert("❌ Domain tidak diizinkan! Masuk ke Firebase Console -> Authentication -> Settings -> Authorized Domains, lalu tambahkan domain ini.");
             } else {
                 alert("⚠️ Gagal masuk: " + error.message);
             }
+            // Jika login gagal/dibatalkan, kembalikan ke halaman login
+            if (window.showAuthPage) window.showAuthPage();
         } finally {
             if(btn) btn.innerText = originalText;
         }
@@ -781,13 +787,16 @@
     // Handler Pemantau Status Sesi Aktif Browser
     onAuthStateChanged(window.auth, async (user) => {
         if (user) {
+            // 👉 LANGSUNG REDIRECT KE MENU UTAMA (Biar saat refresh tidak nunggu load data Firestore lama)
+            if (window.showMainPage) window.showMainPage();
+
             const userRef = window.doc(window.db, "users", user.uid);
             const docSnap = await window.getDoc(userRef);
             if (docSnap.exists()) {
-                window.initializeAppWithUserData(docSnap.data(), docSnap.data().username || "Player");
+                if(window.initializeAppWithUserData) window.initializeAppWithUserData(docSnap.data(), docSnap.data().username || "Player");
             }
         } else {
-            window.showAuthPage();
+            if(window.showAuthPage) window.showAuthPage();
         }
     });
 
@@ -795,13 +804,12 @@
         if(confirm("Apakah Anda yakin ingin keluar dari akun?")) {
             await signOut(window.auth);
             localStorage.removeItem('nusaCraft_sessionUser');
-            window.showAuthPage();
+            if(window.showAuthPage) window.showAuthPage();
         }
     };
 </script>
 
 <script>
-
 function openVairooYT(){window.open("https://youtube.com/@vairoo-n2o1n?si=-6Uu7o39nHAOLX59","_blank");}
 function openNusaYT(){window.open("https://youtube.com/@nusa_craft?si=Mdb_YDnu0QV5rQAR","_blank");}
 function downloadQRIS(){
