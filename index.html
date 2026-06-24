@@ -299,7 +299,7 @@
     </div>
 
     <div id="profileSelectionPage" class="page-section">
-        <div class="profile-header">PILIH PROFILE</div>
+        <div class="profile-header">PILIH PROFIL</div>
         <div class="profile-subtitle">Masuk sebagai siapa hari ini?</div>
         
         <div class="profile-grid" id="profileGridContainer">
@@ -416,6 +416,9 @@
                 <div class="settings-item clickable" onclick="showProfileSelection()">
                     <div class="settings-label">👥 Ganti Profile Player</div>
                     <div class="settings-value">➔</div>
+                </div>
+                <div class="settings-item clickable" onclick="deleteProfileFromSettings()">
+                    <div class="settings-label" style="color: #ef4444; font-weight: bold;">🗑 Hapus Profil Aktif</div>
                 </div>
             </div>
 
@@ -643,14 +646,11 @@
 
         <div style="width: 100%; text-align: left; margin-bottom: 8px; font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Nama Profile</div>
         <div style="display: flex; gap: 8px; width: 100%; margin-bottom: 14px;">
-            <input type="text" id="profileNameInput" placeholder="Contoh: ShadowHunter" class="input-text" style="margin-bottom: 0; flex: 1;" autocomplete="off" maxlength="20">
+            <input type="text" id="profileNameInput" placeholder="Contoh: Player1234" class="input-text" style="margin-bottom: 0; flex: 1;" autocomplete="off" maxlength="20">
             <button class="btn-detail" onclick="generateRandomName()" style="width: 48px; flex-shrink: 0; font-size: 18px; padding: 0; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: #10b981;" title="Acak Nama">🎲</button>
         </div>
 
         <button class="btn-action" id="btnSaveProfile" onclick="saveProfile()">SIMPAN PROFILE</button>
-        
-        <button class="btn-detail" id="btnDeleteProfile" onclick="deleteCurrentProfile()" style="margin-top: 10px; background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.2); display: none;">🗑️ HAPUS PROFILE</button>
-        
         <button class="btn-close" onclick="closeProfileModal()">BATAL</button>
     </div>
 </div>
@@ -813,7 +813,7 @@
 
     const provider = new GoogleAuthProvider();
 
-    // UTIL: Timeout Wrapper
+    // UTIL: Timeout & Retry Wrapper
     const withTimeout = (promise, ms) => {
         return Promise.race([
             promise,
@@ -821,48 +821,58 @@
         ]);
     };
 
+    async function fetchWithRetry(fetcher, retries = 3) {
+        for (let i = 0; i < retries; i++) {
+            try {
+                return await fetcher();
+            } catch (e) {
+                if (i === retries - 1) throw e;
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
+    }
+
     window.loginDenganGoogle = async function() {
         const btn = document.getElementById('btnGoogleAuth');
         const originalText = btn.innerText;
         btn.innerText = "MENGHUBUNGKAN...";
         
         try {
-            const loginTask = async () => {
-                const result = await signInWithPopup(window.auth, provider);
-                const user = result.user;
+            const result = await signInWithPopup(window.auth, provider);
+            const user = result.user;
+            console.log("LOGIN SUCCESS");
+            
+            const fetchTask = async () => {
                 const userRef = window.doc(window.db, "users", user.uid);
                 const docSnap = await window.getDoc(userRef);
 
-                let justCreated = false;
-                
                 if (docSnap.exists()) {
+                    console.log("USER DOC FOUND");
                     let dbData = docSnap.data();
                     if (!dbData.profiles || Object.keys(dbData.profiles).length === 0) {
                         dbData = await autoCreateFirstProfile(userRef, dbData, user);
-                        justCreated = true;
                     }
-                    return { data: dbData, user: user, justCreated };
+                    return { data: dbData, user: user };
                 } else {
+                    console.log("USER DOC CREATED");
                     const newAccountSchema = {
                         uid: user.uid, email: user.email, createdAt: new Date().toISOString(),
                         activeProfileId: null, profiles: {},
-                        settings: { theme: 'dark', fontSize: 'medium' },
-                        gameData: { coins: 0, clickPower: 1, upgradeCost: 50, snakeHigh: 0, savedNews: [], registeredEvents: [] }
+                        settings: { theme: 'dark', fontSize: 'medium' }
                     };
                     const newData = await autoCreateFirstProfile(userRef, newAccountSchema, user);
-                    return { data: newData, user: user, justCreated: true };
+                    return { data: newData, user: user };
                 }
             };
 
-            const response = await withTimeout(loginTask(), 5000);
-            window.isGuest = false;
-            window.initializeAppWithUserData(response.data, response.user, response.justCreated);
+            const response = await fetchWithRetry(() => withTimeout(fetchTask(), 5000), 3);
+            window.initializeAppWithUserData(response.data, response.user);
 
         } catch (error) {
             console.error("Auth Error/Timeout:", error);
             if(error.code !== "auth/popup-closed-by-user") {
-                // FALLBACK: Sesi Tamu Jika Error/Timeout
-                window.startGuestSession();
+                alert("Gagal terhubung ke server. Periksa koneksi internet Anda.");
+                if(window.showAuthPage) window.showAuthPage();
             }
         } finally {
             if(btn) btn.innerText = originalText;
@@ -874,12 +884,16 @@
         let randomAvatar = window.defaultAvatars[Math.floor(Math.random() * window.defaultAvatars.length)];
         const defaultProfileId = 'prof_' + Date.now();
         
-        baseData.activeProfileId = defaultProfileId;
         baseData.profiles = {
-            [defaultProfileId]: { id: defaultProfileId, name: cleanName, avatar: randomAvatar, createdAt: new Date().toISOString() }
+            [defaultProfileId]: { 
+                id: defaultProfileId, name: cleanName, avatar: randomAvatar, createdAt: new Date().toISOString(),
+                coins: 0, clickPower: 1, upgradeCost: 50, snakeHigh: 0, savedNews: [], registeredEvents: []
+            }
         };
+        baseData.activeProfileId = defaultProfileId;
         
-        await window.setDoc(userRef, baseData, { merge: true });
+        await fetchWithRetry(() => window.setDoc(userRef, baseData, { merge: true }), 3);
+        console.log("PROFILE CREATED");
         return baseData;
     }
 
@@ -890,23 +904,30 @@
                     const userRef = window.doc(window.db, "users", user.uid);
                     const docSnap = await window.getDoc(userRef);
                     if (docSnap.exists()) {
+                        console.log("USER DOC FOUND");
                         let dbData = docSnap.data();
-                        let justCreated = false;
                         if (!dbData.profiles || Object.keys(dbData.profiles).length === 0) {
                             dbData = await autoCreateFirstProfile(userRef, dbData, user);
-                            justCreated = true;
                         }
-                        return { data: dbData, justCreated };
+                        return { data: dbData };
+                    } else {
+                        console.log("USER DOC CREATED");
+                        const newAccountSchema = {
+                            uid: user.uid, email: user.email, createdAt: new Date().toISOString(),
+                            activeProfileId: null, profiles: {},
+                            settings: { theme: 'dark', fontSize: 'medium' }
+                        };
+                        const newData = await autoCreateFirstProfile(userRef, newAccountSchema, user);
+                        return { data: newData };
                     }
-                    throw new Error("No data found");
                 };
 
-                const res = await withTimeout(fetchTask(), 5000);
-                window.isGuest = false;
-                window.initializeAppWithUserData(res.data, user, res.justCreated);
+                const res = await fetchWithRetry(() => withTimeout(fetchTask(), 5000), 3);
+                window.initializeAppWithUserData(res.data, user);
             } catch (error) {
                 console.error("Auto Login Error:", error);
-                window.startGuestSession();
+                alert("Koneksi gagal saat memuat data. Silakan coba login kembali.");
+                if(window.showAuthPage) window.showAuthPage();
             }
         } else {
             if(window.showAuthPage) window.showAuthPage();
@@ -968,51 +989,17 @@ window.defaultAvatars = [
     "https://minotar.net/helm/Sapnap/100.png", "https://minotar.net/helm/PewDiePie/100.png"
 ];
 
-const namePrefixes = ["Shadow", "Nusa", "Dark", "Sky", "Red", "Golden", "Storm", "Pixel", "Alpha", "Night", "Frost", "Mystic", "Titan", "Nova", "Void", "Iron", "Cyber", "Ender"];
-const nameSuffixes = ["Hunter", "Warrior", "Knight", "Legend", "Dragon", "Craft", "Player", "Hero", "Wolf", "Rider", "King", "Master", "Play", "Gamer", "Ninja", "Blade"];
-
 window.generateRandomNameStr = function() {
-    let p = namePrefixes[Math.floor(Math.random() * namePrefixes.length)];
-    let s = nameSuffixes[Math.floor(Math.random() * nameSuffixes.length)];
-    let num = Math.floor(100 + Math.random() * 900); // 3 Digit Random
-    return p + s + num;
+    return "Player" + Math.floor(1000 + Math.random() * 9000);
 };
 
 function generateRandomName() {
     document.getElementById('profileNameInput').value = window.generateRandomNameStr();
 }
 
-// FALLBACK SESSION
-window.startGuestSession = function() {
-    console.warn("Using Guest Session Fallback");
-    let guestId = 'guest_' + Date.now();
-    let guestName = window.generateRandomNameStr();
-    let guestAvatar = window.defaultAvatars[Math.floor(Math.random() * window.defaultAvatars.length)];
-    
-    accountData = {
-        uid: 'guest', email: 'guest@local', activeProfileId: guestId,
-        profiles: { [guestId]: { id: guestId, name: guestName, avatar: guestAvatar, createdAt: new Date().toISOString() } },
-        settings: { theme: 'dark', fontSize: 'medium' },
-        gameData: { coins: 0, clickPower: 1, upgradeCost: 50, snakeHigh: 0, savedNews: [], registeredEvents: [] }
-    };
-    currentProfiles = accountData.profiles;
-    window.isGuest = true; 
-    
-    selectProfile(guestId);
-};
-
-window.initializeAppWithUserData = function(data, authUser, justCreated = false) {
+window.initializeAppWithUserData = function(data, authUser) {
     accountData = data;
     currentProfiles = data.profiles || {};
-    activeProfileId = data.activeProfileId;
-    
-    let gd = data.gameData || {};
-    clickerCoins = gd.coins || 0;
-    clickPower = gd.clickPower || 1;
-    upgradeCost = gd.upgradeCost || 50;
-    highestSnakeScore = gd.snakeHigh || 0;
-    savedNews = gd.savedNews || [];
-    userRegistered = new Set(gd.registeredEvents || []);
     
     if (data.settings) {
         document.getElementById('toggleDarkMode').checked = (data.settings.theme === 'dark');
@@ -1023,10 +1010,9 @@ window.initializeAppWithUserData = function(data, authUser, justCreated = false)
 
     document.getElementById('set_email').innerText = data.email || (authUser ? authUser.email : '-');
 
-    if (justCreated && activeProfileId) {
-        selectProfile(activeProfileId); // Otomatis Menu Utama
-    } else if (Object.keys(currentProfiles).length > 0) {
-        showProfileSelection(); // Tampilkan Pilihan Profile
+    if (Object.keys(currentProfiles).length > 0) {
+        console.log("PROFILE LOADED");
+        showProfileSelection(); 
     } else {
         openCreateProfileModal();
     }
@@ -1064,9 +1050,18 @@ function renderProfileGrid() {
 function selectProfile(id) {
     activeProfileId = id;
     if(accountData) accountData.activeProfileId = id;
-    window.debouncedSyncAccount(); 
     
     let p = currentProfiles[id];
+    
+    clickerCoins = p.coins || 0;
+    clickPower = p.clickPower || 1;
+    upgradeCost = p.upgradeCost || 50;
+    highestSnakeScore = p.snakeHigh || 0;
+    savedNews = p.savedNews || [];
+    userRegistered = new Set(p.registeredEvents || []);
+
+    window.debouncedSyncAccount(); 
+    
     document.getElementById('toolbarProfileName').innerText = p.name;
     document.getElementById('toolbarAvatar').src = p.avatar;
     document.getElementById('set_activeName').innerText = p.name;
@@ -1120,7 +1115,6 @@ function openCreateProfileModal() {
     editingProfileId = null;
     document.getElementById('profileModalTitle').innerText = "BUAT PROFILE BARU";
     document.getElementById('profileNameInput').value = "";
-    document.getElementById('btnDeleteProfile').style.display = "none";
     
     selectedAvatarUrl = window.defaultAvatars[Math.floor(Math.random() * window.defaultAvatars.length)];
     renderAvatarSelection();
@@ -1135,7 +1129,6 @@ function openEditProfileModal() {
     
     document.getElementById('profileModalTitle').innerText = "EDIT PROFILE";
     document.getElementById('profileNameInput').value = p.name;
-    document.getElementById('btnDeleteProfile').style.display = (Object.keys(currentProfiles).length > 1) ? "block" : "none";
     
     selectedAvatarUrl = p.avatar;
     renderAvatarSelection();
@@ -1154,46 +1147,60 @@ function saveProfile() {
 
     let pid = editingProfileId || ('prof_' + Date.now());
     
-    currentProfiles[pid] = {
-        id: pid,
-        name: name,
-        avatar: selectedAvatarUrl,
-        createdAt: currentProfiles[pid] ? currentProfiles[pid].createdAt : new Date().toISOString()
-    };
+    if (!currentProfiles[pid]) {
+        currentProfiles[pid] = {
+            id: pid, name: name, avatar: selectedAvatarUrl, createdAt: new Date().toISOString(),
+            coins: 0, clickPower: 1, upgradeCost: 50, snakeHigh: 0, savedNews: [], registeredEvents: []
+        };
+    } else {
+        currentProfiles[pid].name = name;
+        currentProfiles[pid].avatar = selectedAvatarUrl;
+    }
 
     if(!activeProfileId || !editingProfileId) {
         activeProfileId = pid;
-        accountData.activeProfileId = pid;
+        if(accountData) accountData.activeProfileId = pid;
     }
 
     window.debouncedSyncAccount();
     closeProfileModal();
     
     if(!editingProfileId) { 
-        selectProfile(pid); 
+        showProfileSelection(); 
     } else {
         selectProfile(activeProfileId); 
     }
 }
 
-function deleteCurrentProfile() {
-    if(Object.keys(currentProfiles).length <= 1) { alert("Minimal harus ada 1 profile!"); return; }
-    if(confirm("Yakin ingin menghapus profile ini?")) {
-        delete currentProfiles[editingProfileId];
-        activeProfileId = Object.keys(currentProfiles)[0];
-        accountData.activeProfileId = activeProfileId;
+window.deleteProfileFromSettings = function() {
+    if (confirm("Yakin ingin menghapus profil ini secara permanen? Seluruh game data pada profil ini akan hilang!")) {
+        delete currentProfiles[activeProfileId];
+        activeProfileId = null;
         window.debouncedSyncAccount();
-        closeProfileModal();
-        showProfileSelection(); 
+        
+        if (Object.keys(currentProfiles).length === 0) {
+            openCreateProfileModal();
+        } else {
+            showProfileSelection();
+        }
     }
-}
+};
 
 // CLOUD SYNC ENGINE
 window.debouncedSyncAccount = function() {
-    if(window.isGuest) return; // Nonaktifkan sync jika masuk mode tamu/fallback
     clearTimeout(syncTimeout);
     syncTimeout = setTimeout(() => {
         if (!window.auth || !window.auth.currentUser) return;
+        
+        if (activeProfileId && currentProfiles[activeProfileId]) {
+            currentProfiles[activeProfileId].coins = clickerCoins;
+            currentProfiles[activeProfileId].clickPower = clickPower;
+            currentProfiles[activeProfileId].upgradeCost = upgradeCost;
+            currentProfiles[activeProfileId].snakeHigh = highestSnakeScore;
+            currentProfiles[activeProfileId].savedNews = savedNews;
+            currentProfiles[activeProfileId].registeredEvents = Array.from(userRegistered);
+        }
+
         const userRef = window.doc(window.db, "users", window.auth.currentUser.uid);
         try {
             window.updateDoc(userRef, {
@@ -1202,14 +1209,6 @@ window.debouncedSyncAccount = function() {
                 settings: {
                     theme: document.getElementById('toggleDarkMode').checked ? 'dark' : 'light',
                     fontSize: document.getElementById('fontSizeSelect').value
-                },
-                gameData: {
-                    coins: clickerCoins,
-                    clickPower: clickPower,
-                    upgradeCost: upgradeCost,
-                    snakeHigh: highestSnakeScore,
-                    savedNews: savedNews,
-                    registeredEvents: Array.from(userRegistered)
                 }
             });
             console.log("☁️ Data Profile & Game tersimpan ke Cloud.");
@@ -1278,9 +1277,10 @@ function changeFontSize(val) {
 
 function resetGameData() {
     if(confirm("Peringatan! Ini akan mereset Koin dan Power Pickaxe Anda menjadi 0. Lanjutkan?")) {
-        clickerCoins = 0; clickPower = 1; upgradeCost = 50;
+        clickerCoins = 0; clickPower = 1; upgradeCost = 50; highestSnakeScore = 0; savedNews = []; userRegistered = new Set();
         updateClickerUI();
         document.getElementById('set_coins').innerText = clickerCoins;
+        document.getElementById('set_snake').innerText = highestSnakeScore;
         window.debouncedSyncAccount();
         alert("✅ Game Data direset.");
     }
@@ -1565,7 +1565,7 @@ document.body.removeChild(link);
             return;
         }
 
-        const currentActiveUser = (activeProfileId && currentProfiles[activeProfileId]) ? currentProfiles[activeProfileId].name : 'Guest';
+        const currentActiveUser = (activeProfileId && currentProfiles[activeProfileId]) ? currentProfiles[activeProfileId].name : 'Player';
         const now = new Date();
         const tgl = String(now.getDate()).padStart(2, '0');
         const bln = String(now.getMonth() + 1).padStart(2, '0');
