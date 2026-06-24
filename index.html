@@ -837,10 +837,12 @@
         const originalText = btn.innerText;
         btn.innerText = "MENGHUBUNGKAN...";
         
+        console.log("LOGIN START");
+        
         try {
             const result = await signInWithPopup(window.auth, provider);
             const user = result.user;
-            console.log("LOGIN SUCCESS");
+            console.log("POPUP LOGIN SUCCESS");
             
             const fetchTask = async () => {
                 const userRef = window.doc(window.db, "users", user.uid);
@@ -870,8 +872,9 @@
 
         } catch (error) {
             console.error("Auth Error/Timeout:", error);
+            // Mencegah error "missing initial state" atau error teknis lainnya tampil ke user
             if(error.code !== "auth/popup-closed-by-user") {
-                alert("Gagal terhubung ke server. Periksa koneksi internet Anda.");
+                alert("Gagal login. Silakan coba lagi.");
                 if(window.showAuthPage) window.showAuthPage();
             }
         } finally {
@@ -926,7 +929,7 @@
                 window.initializeAppWithUserData(res.data, user);
             } catch (error) {
                 console.error("Auto Login Error:", error);
-                alert("Koneksi gagal saat memuat data. Silakan coba login kembali.");
+                alert("Gagal login. Silakan coba lagi.");
                 if(window.showAuthPage) window.showAuthPage();
             }
         } else {
