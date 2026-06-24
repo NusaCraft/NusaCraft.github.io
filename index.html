@@ -788,7 +788,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, getDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, deleteUser } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
     const firebaseConfig = {
@@ -809,27 +809,66 @@
     window.setDoc = setDoc;
     window.getDoc = getDoc;
     window.updateDoc = updateDoc;
+    window.serverTimestamp = serverTimestamp;
     window.deleteUser = deleteUser; 
 
     const provider = new GoogleAuthProvider();
 
-    // UTIL: Timeout & Retry Wrapper
-    const withTimeout = (promise, ms) => {
-        return Promise.race([
-            promise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), ms))
-        ]);
-    };
+    async function autoCreateFirstProfile(userRef, baseData, user) {
+        let cleanName = "Player" + Math.floor(1000 + Math.random() * 9000);
+        let randomAvatar = window.defaultAvatars[Math.floor(Math.random() * window.defaultAvatars.length)];
+        const defaultProfileId = 'prof_' + Date.now();
+        
+        baseData.profiles = baseData.profiles || {};
+        baseData.profiles[defaultProfileId] = { 
+            id: defaultProfileId, 
+            name: cleanName, 
+            avatar: randomAvatar, 
+            createdAt: Date.now(),
+            coins: 0, 
+            clickPower: 1, 
+            upgradeCost: 50, 
+            snakeHigh: 0, 
+            savedNews: [], 
+            registeredEvents: []
+        };
+        baseData.activeProfileId = defaultProfileId;
+        
+        await window.setDoc(userRef, baseData, { merge: true });
+        console.log("PROFILE CREATED");
+        return baseData;
+    }
 
-    async function fetchWithRetry(fetcher, retries = 3) {
-        for (let i = 0; i < retries; i++) {
-            try {
-                return await fetcher();
-            } catch (e) {
-                if (i === retries - 1) throw e;
-                await new Promise(r => setTimeout(r, 1000));
+    async function handleUserAuthSuccess(user) {
+        console.log("CHECKING USER DOC");
+        const userRef = window.doc(window.db, "users", user.uid);
+        const docSnap = await window.getDoc(userRef);
+
+        let dbData;
+
+        if (docSnap.exists()) {
+            console.log("USER DOC FOUND");
+            dbData = docSnap.data();
+            if (!dbData.profiles || Object.keys(dbData.profiles).length === 0) {
+                dbData = await autoCreateFirstProfile(userRef, dbData, user);
             }
+        } else {
+            console.log("USER DOC NOT FOUND");
+            console.log("CREATING USER DOC");
+            const newAccountSchema = {
+                uid: user.uid, 
+                email: user.email, 
+                createdAt: window.serverTimestamp(),
+                activeProfileId: null, 
+                profiles: {},
+                settings: { theme: 'dark', fontSize: 'medium' }
+            };
+            dbData = await autoCreateFirstProfile(userRef, newAccountSchema, user);
+            console.log("USER DOC CREATED");
         }
+
+        console.log("LOGIN COMPLETE");
+        window.initializeAppWithUserData(dbData, user);
     }
 
     window.loginDenganGoogle = async function() {
@@ -842,94 +881,30 @@
         try {
             const result = await signInWithPopup(window.auth, provider);
             const user = result.user;
-            console.log("POPUP LOGIN SUCCESS");
             
-            const fetchTask = async () => {
-                const userRef = window.doc(window.db, "users", user.uid);
-                const docSnap = await window.getDoc(userRef);
-
-                if (docSnap.exists()) {
-                    console.log("USER DOC FOUND");
-                    let dbData = docSnap.data();
-                    if (!dbData.profiles || Object.keys(dbData.profiles).length === 0) {
-                        dbData = await autoCreateFirstProfile(userRef, dbData, user);
-                    }
-                    return { data: dbData, user: user };
-                } else {
-                    console.log("USER DOC CREATED");
-                    const newAccountSchema = {
-                        uid: user.uid, email: user.email, createdAt: new Date().toISOString(),
-                        activeProfileId: null, profiles: {},
-                        settings: { theme: 'dark', fontSize: 'medium' }
-                    };
-                    const newData = await autoCreateFirstProfile(userRef, newAccountSchema, user);
-                    return { data: newData, user: user };
-                }
-            };
-
-            const response = await fetchWithRetry(() => withTimeout(fetchTask(), 5000), 3);
-            window.initializeAppWithUserData(response.data, response.user);
+            console.log("GOOGLE AUTH SUCCESS");
+            console.log("AUTH USER:", user.uid);
+            
+            await handleUserAuthSuccess(user);
 
         } catch (error) {
-            console.error("Auth Error/Timeout:", error);
-            // Mencegah error "missing initial state" atau error teknis lainnya tampil ke user
-            if(error.code !== "auth/popup-closed-by-user") {
-                alert("Gagal login. Silakan coba lagi.");
-                if(window.showAuthPage) window.showAuthPage();
+            console.error("Auth Error:", error);
+            if(error.code !== "auth/popup-closed-by-user" && error.code !== "auth/cancelled-popup-request") {
+                alert("ERROR CODE: " + (error.code || "UNKNOWN") + "\n\nMESSAGE: " + error.message);
             }
+            if(window.showAuthPage) window.showAuthPage();
         } finally {
             if(btn) btn.innerText = originalText;
         }
     };
 
-    async function autoCreateFirstProfile(userRef, baseData, user) {
-        let cleanName = window.generateRandomNameStr();
-        let randomAvatar = window.defaultAvatars[Math.floor(Math.random() * window.defaultAvatars.length)];
-        const defaultProfileId = 'prof_' + Date.now();
-        
-        baseData.profiles = {
-            [defaultProfileId]: { 
-                id: defaultProfileId, name: cleanName, avatar: randomAvatar, createdAt: new Date().toISOString(),
-                coins: 0, clickPower: 1, upgradeCost: 50, snakeHigh: 0, savedNews: [], registeredEvents: []
-            }
-        };
-        baseData.activeProfileId = defaultProfileId;
-        
-        await fetchWithRetry(() => window.setDoc(userRef, baseData, { merge: true }), 3);
-        console.log("PROFILE CREATED");
-        return baseData;
-    }
-
     onAuthStateChanged(window.auth, async (user) => {
         if (user) {
             try {
-                const fetchTask = async () => {
-                    const userRef = window.doc(window.db, "users", user.uid);
-                    const docSnap = await window.getDoc(userRef);
-                    if (docSnap.exists()) {
-                        console.log("USER DOC FOUND");
-                        let dbData = docSnap.data();
-                        if (!dbData.profiles || Object.keys(dbData.profiles).length === 0) {
-                            dbData = await autoCreateFirstProfile(userRef, dbData, user);
-                        }
-                        return { data: dbData };
-                    } else {
-                        console.log("USER DOC CREATED");
-                        const newAccountSchema = {
-                            uid: user.uid, email: user.email, createdAt: new Date().toISOString(),
-                            activeProfileId: null, profiles: {},
-                            settings: { theme: 'dark', fontSize: 'medium' }
-                        };
-                        const newData = await autoCreateFirstProfile(userRef, newAccountSchema, user);
-                        return { data: newData };
-                    }
-                };
-
-                const res = await fetchWithRetry(() => withTimeout(fetchTask(), 5000), 3);
-                window.initializeAppWithUserData(res.data, user);
+                await handleUserAuthSuccess(user);
             } catch (error) {
                 console.error("Auto Login Error:", error);
-                alert("Gagal login. Silakan coba lagi.");
+                alert("ERROR CODE: " + (error.code || "UNKNOWN") + "\n\nMESSAGE: " + error.message);
                 if(window.showAuthPage) window.showAuthPage();
             }
         } else {
@@ -961,7 +936,7 @@
                 if (error.code === 'auth/requires-recent-login') {
                     alert("⚠️ Sesi Anda sudah terlalu lama. Silakan Logout dan Login kembali sebelum menghapus akun.");
                 } else {
-                    alert("❌ Gagal menghapus akun: " + error.message);
+                    alert("ERROR CODE: " + error.code + "\n\nMESSAGE: " + error.message);
                 }
             }
         }
@@ -1014,7 +989,6 @@ window.initializeAppWithUserData = function(data, authUser) {
     document.getElementById('set_email').innerText = data.email || (authUser ? authUser.email : '-');
 
     if (Object.keys(currentProfiles).length > 0) {
-        console.log("PROFILE LOADED");
         showProfileSelection(); 
     } else {
         openCreateProfileModal();
@@ -1190,6 +1164,7 @@ window.deleteProfileFromSettings = function() {
 };
 
 // CLOUD SYNC ENGINE
+let syncTimeout;
 window.debouncedSyncAccount = function() {
     clearTimeout(syncTimeout);
     syncTimeout = setTimeout(() => {
@@ -1496,13 +1471,12 @@ document.body.removeChild(link);
     let allNewsData = [];
     
     let eventParticipants = {}; 
-    let playerFeedbacks = JSON.parse(localStorage.getItem('nusaCraft_feedbacks')) || [];
+    let playerFeedbacks = [];
 
     let eventsHtml = '';
     let peraturanHtml = '';
     let pemenangHtml = '';
     let countdownInterval = null;
-    let syncTimeout;
 
     function formatRawDateString(rawDateStr) {
         if (!rawDateStr || !rawDateStr.startsWith('Date(') || !rawDateStr.endsWith(')')) { return rawDateStr; }
@@ -1600,7 +1574,6 @@ document.body.removeChild(link);
                     pesan: pesanText,
                     waktu: waktuFormat
                 });
-                localStorage.setItem('nusaCraft_feedbacks', JSON.stringify(playerFeedbacks));
                 textInput.value = '';
                 alert("✅ Feedback Anda berhasil dikirim ke Admin!");
                 renderPlayerFeedbacks();
@@ -1767,28 +1740,13 @@ document.body.removeChild(link);
                     }
                 }
                 
-                const cachedEvents = localStorage.getItem('nusaCraft_cache_events_raw');
-                if (cachedEvents) {
-                    buildEventCache(JSON.parse(cachedEvents));
-                    if (eventPage.style.display === 'block') renderEvents();
-                }
+                if (eventPage.style.display === 'block') renderEvents();
             })
             .catch(e => console.error("Gagal ambil peserta:", e));
     }
 
     function fetchEventsData() {
-        const cached = localStorage.getItem('nusaCraft_cache_events_raw');
-        if (cached) {
-            try {
-                buildEventCache(JSON.parse(cached));
-                eventFetchStatus = 'success';
-            } catch (e) {
-                localStorage.removeItem('nusaCraft_cache_events_raw');
-            }
-        } else {
-            eventFetchStatus = 'loading';
-        }
-        
+        eventFetchStatus = 'loading';
         if (eventPage.style.display === 'block') renderEvents();
         
         fetch(SHEETS_URL)
@@ -1799,34 +1757,22 @@ document.body.removeChild(link);
             .then(data => {
                 const jsonObj = cleanJsonResponse(data);
                 if (jsonObj.table && jsonObj.table.rows) {
-                    localStorage.setItem('nusaCraft_cache_events_raw', JSON.stringify(jsonObj.table.rows));
                     buildEventCache(jsonObj.table.rows);
                     eventFetchStatus = 'success';
-                } else if (!cached) {
+                } else {
                     eventFetchStatus = 'error';
                 }
                 renderEvents();
                 if (pemenangPage.style.display === 'block') renderPemenang();
             }).catch(e => {
                 console.error('Fetch event failed', e);
-                if (!cached) eventFetchStatus = 'error';
+                eventFetchStatus = 'error';
                 renderEvents();
             });
     }
 
     function fetchPeraturanData() {
-        const cached = localStorage.getItem('nusaCraft_cache_rules_raw');
-        if (cached) {
-            try {
-                buildPeraturanCache(JSON.parse(cached));
-                peraturanFetchStatus = 'success';
-            } catch (e) {
-                localStorage.removeItem('nusaCraft_cache_rules_raw');
-            }
-        } else {
-            peraturanFetchStatus = 'loading';
-        }
-        
+        peraturanFetchStatus = 'loading';
         if (peraturanPage.style.display === 'block') renderPeraturan();
         
         fetch(PERATURAN_URL)
@@ -1837,33 +1783,21 @@ document.body.removeChild(link);
             .then(data => {
                 const jsonObj = cleanJsonResponse(data);
                 if (jsonObj.table && jsonObj.table.rows) {
-                    localStorage.setItem('nusaCraft_cache_rules_raw', JSON.stringify(jsonObj.table.rows));
                     buildPeraturanCache(jsonObj.table.rows);
                     peraturanFetchStatus = 'success';
-                } else if (!cached) {
+                } else {
                     peraturanFetchStatus = 'error';
                 }
                 renderPeraturan();
             }).catch(e => {
                 console.error('Fetch peraturan failed', e);
-                if (!cached) peraturanFetchStatus = 'error';
+                peraturanFetchStatus = 'error';
                 renderPeraturan();
             });
     }
 
     function fetchPemenangData() {
-        const cached = localStorage.getItem('nusaCraft_cache_winners_raw');
-        if (cached) {
-            try {
-                buildPemenangCache(JSON.parse(cached));
-                pemenangFetchStatus = 'success';
-            } catch (e) {
-                localStorage.removeItem('nusaCraft_cache_winners_raw');
-            }
-        } else {
-            pemenangFetchStatus = 'loading';
-        }
-        
+        pemenangFetchStatus = 'loading';
         if (pemenangPage.style.display === 'block') renderPemenang();
         
         fetch(PEMENANG_URL)
@@ -1874,16 +1808,15 @@ document.body.removeChild(link);
             .then(data => {
                 const jsonObj = cleanJsonResponse(data);
                 if (jsonObj.table && jsonObj.table.rows) {
-                    localStorage.setItem('nusaCraft_cache_winners_raw', JSON.stringify(jsonObj.table.rows));
                     buildPemenangCache(jsonObj.table.rows);
                     pemenangFetchStatus = 'success';
-                } else if (!cached) {
+                } else {
                     pemenangFetchStatus = 'error';
                 }
                 renderPemenang();
             }).catch(e => {
                 console.error('Fetch pemenang failed', e);
-                if (!cached) pemenangFetchStatus = 'error';
+                pemenangFetchStatus = 'error';
                 renderPemenang();
             });
     }
@@ -2456,7 +2389,6 @@ document.body.removeChild(link);
     function executeDeleteFeedback(index) {
         if (confirm("Apakah Anda yakin ingin menghapus feedback ini dari perangkat Anda?")) {
             playerFeedbacks.splice(index, 1);
-            localStorage.setItem('nusaCraft_feedbacks', JSON.stringify(playerFeedbacks));
             renderPlayerFeedbacks();
         }
     }
